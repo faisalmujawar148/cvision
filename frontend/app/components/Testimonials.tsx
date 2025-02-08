@@ -2,47 +2,49 @@ import Image from "next/image"
 
 const testimonials = [
   {
-    quote: "CVision helped me tailor my resume perfectly for each application. I landed my dream job within weeks!",
-    author: "Sarah Johnson",
+    name: "Sarah Johnson",
     role: "Software Engineer",
+    content:
+      "CVision helped me tailor my resume perfectly for my dream job. I got called for an interview within days!",
     avatar: "/placeholder.svg?height=80&width=80",
   },
   {
-    quote: "The project suggestions feature is a game-changer. It helped me build a portfolio that truly stands out.",
-    author: "Michael Chen",
+    name: "Michael Chen",
+    role: "Data Scientist",
+    content:
+      "The project recommendations were spot-on. I built two suggested projects and landed a great job soon after.",
+    avatar: "/placeholder.svg?height=80&width=80",
+  },
+  {
+    name: "Emily Rodriguez",
     role: "UX Designer",
-    avatar: "/placeholder.svg?height=80&width=80",
-  },
-  {
-    quote: "As a career coach, I recommend CVision to all my clients. It's an invaluable tool for job seekers.",
-    author: "Emily Rodriguez",
-    role: "Career Coach",
+    content: "I love how easy it is to update my resume on the fly. CVision has been a game-changer in my job search.",
     avatar: "/placeholder.svg?height=80&width=80",
   },
 ]
 
 export default function Testimonials() {
   return (
-    <section id="testimonials" className="py-20 bg-white">
+    <section id="testimonials" className="py-20 bg-background">
       <div className="container mx-auto">
-        <h2 className="text-3xl font-bold text-center mb-12">What Our Customers Say</h2>
+        <h2 className="text-3xl font-bold text-center mb-12 text-foreground">What Our Users Say</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {testimonials.map((testimonial, index) => (
-            <div key={index} className="bg-gray-50 p-6 rounded-lg shadow-md">
-              <p className="text-gray-600 mb-4">"{testimonial.quote}"</p>
-              <div className="flex items-center">
+            <div key={index} className="bg-card border border-border p-6 rounded-lg shadow-sm">
+              <div className="flex items-center mb-4">
                 <Image
                   src={testimonial.avatar || "/placeholder.svg"}
-                  alt={testimonial.author}
+                  alt={testimonial.name}
                   width={40}
                   height={40}
                   className="rounded-full mr-4"
                 />
                 <div>
-                  <p className="font-semibold">{testimonial.author}</p>
-                  <p className="text-sm text-gray-500">{testimonial.role}</p>
+                  <h3 className="font-semibold text-foreground">{testimonial.name}</h3>
+                  <p className="text-sm text-muted-foreground">{testimonial.role}</p>
                 </div>
               </div>
+              <p className="text-muted-foreground">{testimonial.content}</p>
             </div>
           ))}
         </div>

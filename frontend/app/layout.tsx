@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "CVision - AI-Powered Resume Optimization",
   description:
-    "CVision uses AI to analyze job descriptions and optimize your resume, increasing your chances of landing your dream job.",
+    "CVision analyzes job descriptions and tailors your resume to match, increasing your chances of landing your dream job.",
 }
 
 export default function RootLayout({
@@ -17,7 +17,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body className={inter.className}>{children}</body>
     </html>
   )
