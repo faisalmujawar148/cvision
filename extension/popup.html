@@ -2,26 +2,22 @@
 <html>
   <head>
     <style>
-      body {
-        width: 200px;
-        padding: 10px;
-        text-align: center;
-      }
-      #compareBtn {
-        padding: 10px;
-        background: #4CAF50;
-        color: white;
-        border: none;
+      /* Previous styles */
+      #cvUpload { display: none; }
+      .upload-label {
+        display: block;
+        margin: 10px 0;
+        padding: 8px;
+        background: #007bff;
+        color: black;
         cursor: pointer;
         border-radius: 4px;
-      }
-      #status {
-        margin-top: 10px;
-        color: #666;
       }
     </style>
   </head>
   <body>
+    <input type="file" id="cvUpload" accept=".pdf,.docx">
+    <label for="cvUpload" class="upload-label">Upload CV</label>
     <button id="compareBtn">Start Comparing</button>
     <div id="status">Ready</div>
     <script src="popup.js"></script>
