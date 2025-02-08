@@ -1,12 +1,18 @@
 {
   "name": "CVision Scraper",
+  "manifest_version": 3,
   "description": "CVision Extension: scrapes job descriptions",
   "version": "0.1",
   "permissions": ["activeTab", "scripting", "storage"],
-  "host_permissions": [
-  "manifest_version": 3,
+  "host_permissions": ["*://*/*"],
   "action": {
-    "default_popup": "hello.html",
-    "default_icon": "hello_extensions.png"
-  }
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png"
+  } 
 }
+
