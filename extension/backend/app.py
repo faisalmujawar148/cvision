@@ -1,4 +1,4 @@
-I want you to alter popup.js, and the rest of the extension files to work around this backend/app.py:
+
 import streamlit as st
 import os
 import re
