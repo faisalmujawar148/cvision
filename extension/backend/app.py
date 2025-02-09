@@ -1,40 +1,35 @@
-import streamlit as st
 import os
 import re
-from io import BytesIO
-from docx import Document
-import PyPDF2
-from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
-import requests
 import json
+from io import BytesIO
+
+import streamlit as st
+import requests
+import PyPDF2
+from docx import Document
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 from flask import Flask, request, jsonify
+from flask_cors import CORS
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
+CORS(app)  
+CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST"], "allow_headers": ["Content-Type"]}})
 
-@app.route('/receive_job', methods=['POST'])
-def receive_job():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No data received"}), 400
-    
-    job_title = data.get("jobTitle", "Unknown")
-    company_name = data.get("companyName", "Unknown")
-    job_description = data.get("jobDescription", "No description")
 
-    # Here, you can process the job description (e.g., store in DB, analyze it)
-    print(f"Received job: {job_title} at {company_name}")
 
-    return jsonify({"status": "success", "received": data})
 
-if __name__ == '__main__':
-    app.run(debug=True)
+# Folder to store uploaded resumes
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Replace 'your_api_key_here' with your actual Mistral API key
+# Use your Streamlit secrets to store the API key (ensure st.secrets is configured in your environment)
 API_KEY = st.secrets["Mistral_AI_Key"]
 API_URL = 'https://api.mistral.ai/v1/chat/completions'
 
 def analyze_gaps(cv_text: str, job_description: str) -> dict:
-    prompt = f"""
+    # First API prompt: Detailed Analysis
+    analysis_prompt = f"""
         Analyze this resume against the job description. Provide **only criticisms and actionable suggestions** in bullet points. Do not mention any positive aspects. Be extremely precise and concise. Follow these rules:
         
         1. **Focus on missing skills or experiences** directly related to the job description.
@@ -44,7 +39,7 @@ def analyze_gaps(cv_text: str, job_description: str) -> dict:
         5. **Word limit**: 100 words. Be direct and avoid fluff.
         
         Resume:
-        {cv_text[:2000]}  # Truncate to avoid exceeding token limits
+        {cv_text[:2000]}  
         
         Job Description:
         {job_description[:2000]}
@@ -53,27 +48,70 @@ def analyze_gaps(cv_text: str, job_description: str) -> dict:
         - **Missing Skills**: [specific skills missing]
         - **Weak Areas**: [exact sentences or sections to improve]
         - **Project Suggestions**: [specific projects to add or improve]
-        """ 
+    """
+
+    # Second API prompt: Extract Missing Keywords
+    keyword_prompt = f"""
+        Identify **keywords** from the job description that are **missing** in the resume. These should be:
+        - Hard skills, technologies, or industry-specific terms.
+        - Certifications or qualifications.
+        - Important soft skills mentioned in the job description.
+        
+        Resume:
+        {cv_text[:2000]}
+        
+        Job Description:
+        {job_description[:2000]}
+        
+        Return the missing keywords **as a comma-separated list** without explanations. Example:
+        Missing Keywords: [keyword1, keyword2, keyword3, ...]
+    """
+
     headers = {
         'Authorization': f'Bearer {API_KEY}',
         'Content-Type': 'application/json'
     }
-    payload = {
-        'model': 'open-mixtral-8x22b',  # Specify the model you want to use
-        'messages': [
-            {'role': 'user', 'content': prompt}
-        ]
-    }
-    try:
-        response = requests.post(API_URL, headers=headers, data=json.dumps(payload))
-        response.raise_for_status()
-        result = response.json()
-        ai_analysis = result['choices'][0]['message']['content']
-        return {"ai_analysis": ai_analysis, "missing_keywords": []}
-    except requests.exceptions.RequestException as e:
-        st.error(f"API request failed: {e}")
-        return {"ai_analysis": "Error during analysis.", "missing_keywords": []}
 
+    # First API Call: Detailed Analysis
+    payload_analysis = {
+        'model': 'open-mixtral-8x22b',
+        'messages': [{'role': 'user', 'content': analysis_prompt}]
+    }
+
+    # Second API Call: Extract Missing Keywords
+    payload_keywords = {
+        'model': 'open-mixtral-8x22b',
+        'messages': [{'role': 'user', 'content': keyword_prompt}]
+    }
+
+    try:
+        # Call the API for detailed analysis
+        response_analysis = requests.post(API_URL, headers=headers, data=json.dumps(payload_analysis))
+        response_analysis.raise_for_status()
+        analysis_result = response_analysis.json()
+        ai_analysis = analysis_result['choices'][0]['message']['content']
+
+        # Call the API for missing keywords
+        response_keywords = requests.post(API_URL, headers=headers, data=json.dumps(payload_keywords))
+        response_keywords.raise_for_status()
+        keyword_result = response_keywords.json()
+        missing_keywords = keyword_result['choices'][0]['message']['content']
+
+        # Clean up the response to extract the keywords
+        missing_keywords = missing_keywords.replace("Missing Keywords:", "").strip()
+        missing_keywords_list = [keyword.strip() for keyword in missing_keywords.split(",") if keyword.strip()]
+
+        return {
+            "ai_analysis": ai_analysis,
+            "missing_keywords": missing_keywords_list
+        }
+
+    except requests.exceptions.RequestException as e:
+        print(f"API request failed: {e}")
+        return {
+            "ai_analysis": "Error during analysis.",
+            "missing_keywords": []
+        }
 
 def parse_cv(file: BytesIO) -> str:
     """
@@ -89,114 +127,66 @@ def parse_cv(file: BytesIO) -> str:
                 if page_text:
                     text += page_text
         except Exception as e:
-            st.error(f"Error reading PDF: {e}")
+            print(f"Error reading PDF: {e}")
     elif filename.endswith('.docx'):
         try:
             doc = Document(file)
             text = "\n".join([para.text for para in doc.paragraphs])
         except Exception as e:
-            st.error(f"Error reading DOCX: {e}")
+            print(f"Error reading DOCX: {e}")
     elif filename.endswith('.txt'):
         try:
             text = file.read().decode("utf-8")
         except Exception as e:
-            st.error(f"Error reading TXT: {e}")
+            print(f"Error reading TXT: {e}")
     else:
-        st.error("Unsupported file format.")
-
+        print("Unsupported file format.")
     # Clean extra whitespace
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
-def extract_keywords(text: str) -> set:
-    """
-    Tokenize the text and remove common stopwords to extract a set of keywords.
-    """
-    tokens = re.findall(r'\b\w+\b', text.lower())
-    keywords = {token for token in tokens if token.isalpha() and token not in ENGLISH_STOP_WORDS}
-    return keywords
+@app.route("/upload", methods=["POST"])
+def upload_file():
+    # Check for the resume file
+    if "resume" not in request.files:
+        return jsonify({"error": "No resume file provided"}), 400
 
-# def analyze_gaps(cv_text: str, job_description: str) -> dict:
-#    """
-#    Perform a simple gap analysis by comparing keywords and then use GPT-4 to provide recommendations.
-#    """
-#    # 1. Simple Keyword Extraction (without spaCy)
-#    job_keywords = extract_keywords(job_description)
-#    cv_keywords = extract_keywords(cv_text)
-#    missing_keywords = list(job_keywords - cv_keywords)
-#
-#    # Limit to a handful of missing keywords for display
-#    top_missing = missing_keywords[:10]
-#
-#    # 2. GPT-4 Analysis
-#    prompt = f"""
-#    Analyze this resume against the job description below. Provide specific, actionable recommendations:
-#    
-#    Resume:
-#    {cv_text}
-#    
-#    Job Description:
-#    {job_description}
-#    
-#    Format your response as:
-#    - Missing Skills: [comma-separated list]
-#    - Weak Areas: [bulleted list]
-#    - Recommendations: [bulleted list]
-#    """
-#
-#    try:
-#        response = openai.ChatCompletion.create(
-#            model="gpt-3",
-#            messages=[{"role": "user", "content": prompt}],
-#            temperature=0.7,
-#            max_tokens=500
-#        )
-#        # Accessing the response using dictionary keys
-#        ai_analysis = response["choices"][0]["message"]["content"]
-#    except Exception as e:
-#        ai_analysis = f"Error calling OpenAI API: {e}"
-#
-#    return {
-#        "missing_keywords": top_missing,
-#        "ai_analysis": ai_analysis
-#    }
+    file = request.files["resume"]
+    if file.filename == "":
+        return jsonify({"error": "No selected file"}), 400
 
-def streamlit_front():
-    st.title("AI-Powered Resume Optimization")
-    st.markdown(
-        "Upload your CV and paste a job description below to analyze gaps and get actionable recommendations."
-    )
+    # Sanitize filename and save the file
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(file_path)
 
-    st.sidebar.header("Upload Your CV")
-    uploaded_file = st.sidebar.file_uploader("Choose a file (PDF, DOCX, TXT)", type=["pdf", "docx", "txt"])
+    # Retrieve job details from form data (if provided)
+    job_title = request.form.get("jobTitle", "Unknown")
+    company_name = request.form.get("companyName", "Unknown")
+    job_description = request.form.get("jobDescription", "")
 
-    cv_text = ""
-    if uploaded_file is not None:
-        cv_text = parse_cv(uploaded_file)
-        if cv_text:
-            st.sidebar.success("CV successfully loaded!")
-        else:
-            st.sidebar.error("Failed to extract text from the CV.")
+    # Parse the resume to extract its text
+    try:
+        with open(file_path, "rb") as f:
+            resume_text = parse_cv(f)
+    except Exception as e:
+        print(f"Error reading resume file: {e}")
+        resume_text = "Error reading resume file."
 
-    job_description = st.text_area("Job Description", "Enter the job description here...", height=200)
+    # If a job description was provided, perform analysis
+    if job_description:
+        analysis = analyze_gaps(resume_text, job_description)
+        response_data = {
+            "jobTitle": job_title,
+            "companyName": company_name,
+            "analysis": analysis
+        }
+    else:
+        response_data = {
+            "message": "File uploaded successfully, but no job description provided for analysis",
+            "file_path": file_path
+        }
+    return jsonify(response_data)
 
-    if st.button("Analyze"):
-        if not cv_text:
-            st.error("Please upload a CV file.")
-        elif not job_description.strip():
-            st.error("Please enter a job description.")
-        else:
-            with st.spinner("Analyzing..."):
-                analysis = analyze_gaps(cv_text, job_description)
-
-            st.subheader("Missing Keywords (from Job Description)")
-            if analysis["missing_keywords"]:
-                st.write(", ".join(analysis["missing_keywords"]))
-            else:
-                st.write("No significant missing keywords found!")
-
-            st.subheader("GPT-4 Analysis & Recommendations")
-            st.write(analysis["ai_analysis"])
-
-# if __name__ == "__main__":
-#    streamlit_front()
+if __name__ == '__main__':
+    app.run(debug=True)
