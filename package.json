@@ -1,0 +1,26 @@
+{
+  "name": "cvision",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/faisalmujawar148/cvision.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/faisalmujawar148/cvision/issues"
+  },
+  "homepage": "https://github.com/faisalmujawar148/cvision#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "crawlee": "^3.12.2",
+    "express": "^4.21.2"
+  }
+}

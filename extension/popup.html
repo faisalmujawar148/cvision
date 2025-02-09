@@ -1,25 +1,25 @@
 <!DOCTYPE html>
-<html>
-  <head>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Info</title>
     <style>
-      /* Previous styles */
-      #cvUpload { display: none; }
-      .upload-label {
-        display: block;
-        margin: 10px 0;
-        padding: 8px;
-        background: #007bff;
-        color: black;
-        cursor: pointer;
-        border-radius: 4px;
-      }
+        body { font-family: Arial, sans-serif; padding: 10px; width: 300px; }
+        h2 { font-size: 16px; margin-bottom: 5px; }
+        p { font-size: 14px; margin: 5px 0; word-wrap: break-word; }
     </style>
-  </head>
-  <body>
-    <input type="file" id="cvUpload" accept=".pdf,.docx">
-    <label for="cvUpload" class="upload-label">Upload CV</label>
-    <button id="compareBtn">Start Comparing</button>
-    <div id="status">Ready</div>
+</head>
+<body>
+    <h2>Job Title:</h2>
+    <p id="jobTitle">Loading...</p>
+    
+    <h2>Company Name:</h2>
+    <p id="companyName">Loading...</p>
+    
+    <h2>Job Description:</h2>
+    <p id="jobDescription">Loading...</p>
+
     <script src="popup.js"></script>
-  </body>
+</body>
 </html>

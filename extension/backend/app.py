@@ -7,6 +7,27 @@ import PyPDF2
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 import requests
 import json
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+@app.route('/receive_job', methods=['POST'])
+def receive_job():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data received"}), 400
+    
+    job_title = data.get("jobTitle", "Unknown")
+    company_name = data.get("companyName", "Unknown")
+    job_description = data.get("jobDescription", "No description")
+
+    # Here, you can process the job description (e.g., store in DB, analyze it)
+    print(f"Received job: {job_title} at {company_name}")
+
+    return jsonify({"status": "success", "received": data})
+
+if __name__ == '__main__':
+    app.run(debug=True)
 
 # Replace 'your_api_key_here' with your actual Mistral API key
 API_KEY = st.secrets["Mistral_AI_Key"]
@@ -140,7 +161,7 @@ def extract_keywords(text: str) -> set:
 #        "ai_analysis": ai_analysis
 #    }
 
-def main():
+def streamlit_front():
     st.title("AI-Powered Resume Optimization")
     st.markdown(
         "Upload your CV and paste a job description below to analyze gaps and get actionable recommendations."
@@ -177,5 +198,5 @@ def main():
             st.subheader("GPT-4 Analysis & Recommendations")
             st.write(analysis["ai_analysis"])
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#    streamlit_front()
