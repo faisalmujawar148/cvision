@@ -1,29 +1,142 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Listen for the "startComparison" message
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+
   if (request.action === "startComparison") {
+
     const jobData = scrapeJobData();
+
+    console.log("Scraped Job Data:", jobData);
+
+    sendResponse(jobData); // Send the data back
+
   }
+
 });
 
+
+
 // Function to scrape job data
+
 function scrapeJobData() {
+
   // Define selectors for job title, company, and description
+
   const selectors = {
-    description: ".main-description-section, .job-title, #title, .description__text, .top-card-layout__title ", // Common job title selectors
-    company: ".company-name, .employer, .topcard__org-name-link", // Common company selectors
-    title: ".job-description, #job-details, h1,.article__content__view__field__value, .article__content" // Common description selectors
+
+    title: [
+
+      "h1", 
+
+      ".topcard__title", 
+
+      ".job-title", 
+
+      ".listing-title", 
+
+      ".job-title-text",
+
+      "#title"
+
+    ],
+
+    company: [
+
+      ".topcard__org-name-link", 
+
+      ".employer", 
+
+      ".company-name", 
+
+      ".tw-text-sm", 
+
+      ".company"
+
+    ],
+
+    description: [
+
+      ".description__text", 
+
+      ".job-description", 
+
+      "#job-details", 
+
+      ".section__description",
+
+      ".main-description-section",
+
+      ".job-content",
+
+      ".job-body",
+
+      ".article__content",
+
+      "*"
+
+    ]
+
   };
+
+
+
+  // Function to find text from multiple selectors
+
+  function getText(selectors) {
+
+    for (let selector of selectors) {
+
+      let element = document.querySelector(selector);
+
+      if (element) return element.innerText.trim();
+
+    }
+
+    return "Description not found";
+
+  }
+
+
 
   // Scrape data using the selectors
+
   const jobData = {
-    title: document.querySelector(selectors.title)?.innerText?.trim() || "N/A",
-    company: document.querySelector(selectors.company)?.innerText?.trim() || "N/A",
-    description: document.querySelector(selectors.description)?.innerText?.trim() || "N/A"
+
+    title: getText(selectors.title),
+
+    company: getText(selectors.company),
+
+    description: getText(selectors.description)
+
   };
 
+
+
   return jobData;
+
 }
 
-// Print scraped data to the console
+
+
+// Debugging: Print scraped data
+
 const jobData = scrapeJobData();
+
 console.log("Scraped Job Data:", jobData);
