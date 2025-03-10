@@ -8,3 +8,5 @@ openai
 pdfminer.six
 requests
 streamlit
+undetected_chromedriver
+selenium.webdriver.common.by

@@ -30,7 +30,7 @@ API_URL = 'https://api.mistral.ai/v1/chat/completions'
 def analyze_gaps(cv_text: str, job_description: str) -> dict:
     # First API prompt: Detailed Analysis
     analysis_prompt = f"""
-        Analyze this resume against the job description. Provide **only criticisms and actionable suggestions** in bullet points. Do not mention any positive aspects. Be extremely precise and concise. Follow these rules:
+        Analyze this resume against the job description, make sure pick out the job description from the random website div elements. Provide **only criticisms and actionable suggestions** in bullet points. Do not mention any positive aspects. Be extremely precise and concise. Follow these rules:
         
         1. **Focus on missing skills or experiences** directly related to the job description.
         2. **Highlight weak areas** in the resume (e.g., vague descriptions, lack of quantifiable results).
@@ -42,7 +42,7 @@ def analyze_gaps(cv_text: str, job_description: str) -> dict:
         {cv_text[:2000]}  
         
         Job Description:
-        {job_description[:2000]}
+        {job_description[:5000]}
         
         Format your response as:
         - **Missing Skills**: [specific skills missing]
@@ -187,6 +187,162 @@ def upload_file():
             "file_path": file_path
         }
     return jsonify(response_data)
+
+
+
+
+from flask import Flask, request, jsonify
+import undetected_chromedriver as uc
+from selenium.webdriver.common.by import By
+import time
+import random
+
+@app.route('/scrape', methods=['GET'])
+def scrape_job():
+    url = request.args.get('url')
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
+
+    try:
+        # Initialize undetected_chromedriver for stealth browsing
+        options = uc.ChromeOptions()
+        options.headless = True  # Run headless
+        driver = uc.Chrome(options=options)
+        
+        # Set a random delay to mimic human behavior
+        time.sleep(random.uniform(2, 5))
+        driver.get(url)
+        
+        # Wait for dynamic content to load
+        time.sleep(random.uniform(3, 6))
+        
+        # Try to get specific job content first
+        job_titles = [elem.text.strip() for elem in driver.find_elements(By.CSS_SELECTOR, '.job-title') if elem.text.strip()]
+        job_descriptions = [elem.text.strip() for elem in driver.find_elements(By.CSS_SELECTOR, '.job-description') if elem.text.strip()]
+        companies = [elem.text.strip() for elem in driver.find_elements(By.CSS_SELECTOR, '.company-name') if elem.text.strip()]
+        
+        # Check if we got enough content
+        all_text_length = sum(len(text) for text in job_titles + job_descriptions + companies)
+        
+        # If not enough specific content found, extract all text from the page
+        if all_text_length < 100:  # Arbitrary threshold - adjust as needed
+            print("Insufficient specific content, scraping full page")
+            
+            # Get all text from body
+            body_text = driver.find_element(By.TAG_NAME, 'body').text.strip()
+            
+            # Get all paragraphs (non-empty)
+            paragraphs = [elem.text.strip() for elem in driver.find_elements(By.TAG_NAME, 'p') if elem.text.strip()]
+            
+            # Get all divs (non-empty)
+            divs = [elem.text.strip() for elem in driver.find_elements(By.TAG_NAME, 'div') 
+                   if elem.text.strip() and len(elem.text.strip()) > 20]  # Only get divs with substantial content
+            
+            # Get all headings (non-empty)
+            headings = []
+            for i in range(1, 7):
+                headings.extend([elem.text.strip() for elem in driver.find_elements(By.TAG_NAME, f'h{i}') if elem.text.strip()])
+            
+            # Get all list items (non-empty)
+            list_items = [elem.text.strip() for elem in driver.find_elements(By.TAG_NAME, 'li') if elem.text.strip()]
+            
+            # Clean up the data by removing duplicates
+            # Remove duplicated content between divs and paragraphs
+            unique_divs = []
+            for div in divs:
+                if not any(div in p for p in paragraphs) and not any(div in d for d in unique_divs):
+                    unique_divs.append(div)
+            
+            # Process the raw content with AI model
+            raw_content = "\n\n".join([
+                f"PAGE TITLE: {driver.title}",
+                "HEADINGS: " + "\n".join(headings) if headings else "",
+                "PARAGRAPHS: " + "\n\n".join(paragraphs) if paragraphs else "",
+                "LIST ITEMS: " + "\n- ".join(list_items) if list_items else "",
+                "DIVS: " + "\n\n".join(unique_divs) if unique_divs else ""
+            ])
+            
+            # Process with AI
+            processed_content = process_with_ai(raw_content, url)
+            
+            driver.quit()
+            return jsonify(processed_content)
+        
+        # If specific job content was found, format it
+        job_data = {
+            "job_title": job_titles[0] if job_titles else driver.title,
+            "company_name": companies[0] if companies else "Unknown",
+            "job_description": job_descriptions[0] if job_descriptions else "Not found"
+        }
+        
+        # Process with AI
+        processed_content = process_with_ai(json.dumps(job_data), url)
+        print(processed_content)
+        driver.quit()
+        return jsonify(processed_content)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def process_with_ai(content, url):
+    """
+    Use the Mistral AI model to process and format the scraped content
+    """
+    formatting_prompt = f"""
+    You are analyzing content from a job posting website. Extract and organize the following information from the scraped content:
+    
+    1. Job Title (be precise and professional)
+    2. Company Name
+    3. Job Description (clean and well-formatted)
+    4. Required Skills (bullet list)
+    5. Required Experience (years and type)
+    6. Education Requirements
+    7. Salary Range (if available)
+    8. Job Location
+    9. Employment Type (full-time, part-time, contract, etc.)
+    
+    Source URL: {url}
+    
+    Scraped Content:
+    {content[:7000]}
+    
+    Format your response as a JSON object with these fields. Use null for any fields you cannot identify.
+    """
+
+    headers = {
+        'Authorization': f'Bearer {API_KEY}',
+        'Content-Type': 'application/json'
+    }
+
+    payload = {
+        'model': 'open-mixtral-8x22b',
+        'messages': [{'role': 'user', 'content': formatting_prompt}]
+    }
+
+    try:
+        response = requests.post(API_URL, headers=headers, data=json.dumps(payload))
+        response.raise_for_status()
+        result = response.json()
+        formatted_content = result['choices'][0]['message']['content']
+        
+        # Try to parse the response as JSON
+        try:
+            formatted_json = json.loads(formatted_content)
+            return formatted_json
+        except json.JSONDecodeError:
+            # If AI didn't return valid JSON, create a structured response
+            return {
+                "raw_ai_response": formatted_content,
+                "url": url,
+                "processed": False
+            }
+            
+    except requests.exceptions.RequestException as e:
+        print(f"AI processing failed: {e}")
+        return {
+            "error": "Failed to process with AI model",
+            "url": url,
+            "raw_content": content[:500] + "..." if len(content) > 500 else content
+        }
 
 if __name__ == '__main__':
     app.run(debug=True)
